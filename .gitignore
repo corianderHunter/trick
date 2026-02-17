@@ -4,6 +4,8 @@ node_modules
 dist
 build
 test
+*.demo
+*.ini
 .cursor
 .next
 .env
