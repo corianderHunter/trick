@@ -8,7 +8,10 @@ import { ModelConfig } from './entities/model-config.entity';
 import { GenerationTask } from './entities/generation-task.entity';
 import { DialogueStyle } from './entities/dialogue-style.entity';
 import { VisualStyle } from './entities/visual-style.entity';
+import { Ebook } from './entities/ebook.entity';
+import { EbookChapter } from './entities/ebook-chapter.entity';
 import { ModelConfigModule } from './model-config/model-config.module';
+import { EbookModule } from './ebook/ebook.module';
 import { GenerationModule } from './generation/generation.module';
 import { DialogueStyleModule } from './dialogue-style/dialogue-style.module';
 import { VisualStyleModule } from './visual-style/visual-style.module';
@@ -24,7 +27,14 @@ import { VisualStyleModule } from './visual-style/visual-style.module';
       username: process.env.DB_USERNAME ?? 'admin',
       password: process.env.DB_PASSWORD ?? 'admin',
       database: process.env.DB_NAME ?? 'trick',
-      entities: [ModelConfig, GenerationTask, DialogueStyle, VisualStyle],
+      entities: [
+        ModelConfig,
+        GenerationTask,
+        DialogueStyle,
+        VisualStyle,
+        Ebook,
+        EbookChapter,
+      ],
       synchronize: process.env.NODE_ENV !== 'production',
       logging: process.env.NODE_ENV === 'development',
     }),
@@ -32,6 +42,7 @@ import { VisualStyleModule } from './visual-style/visual-style.module';
     GenerationModule,
     DialogueStyleModule,
     VisualStyleModule,
+    EbookModule,
   ],
   controllers: [AppController],
   providers: [AppService],
