@@ -47,6 +47,18 @@ export class Project {
   @Column({ name: 'visual_quantify', type: 'jsonb', nullable: true })
   visualQuantify: Record<string, unknown> | null;
 
+  /** 项目默认剧本创作模型 ID（对应 model_config.id） */
+  @Column({
+    name: 'default_script_model_id',
+    type: 'uuid',
+    nullable: true,
+  })
+  defaultScriptModelId: string | null;
+
+  /** 前置 prompt，在剧本/视频生成时拼在系统提示前 */
+  @Column({ name: 'pre_prompt', type: 'text', nullable: true })
+  prePrompt: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

@@ -23,6 +23,8 @@ export class ProjectService {
       fixedMaterials: dto.fixedMaterials ?? null,
       dialogueQuantify: dto.dialogueQuantify ?? null,
       visualQuantify: dto.visualQuantify ?? null,
+      defaultScriptModelId: dto.defaultScriptModelId ?? null,
+      prePrompt: dto.prePrompt ?? null,
       lastWorkedAt: now,
     });
     return this.projectRepository.save(project);

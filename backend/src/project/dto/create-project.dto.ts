@@ -60,4 +60,14 @@ export class CreateProjectDto {
   @IsOptional()
   @IsObject()
   visualQuantify?: Record<string, unknown> | null;
+
+  @ApiPropertyOptional({ description: '默认剧本创作模型 ID（UUID）' })
+  @IsOptional()
+  @IsUUID('4')
+  defaultScriptModelId?: string | null;
+
+  @ApiPropertyOptional({ description: '前置 prompt' })
+  @IsOptional()
+  @IsString()
+  prePrompt?: string | null;
 }
