@@ -10,11 +10,15 @@ import { DialogueStyle } from './entities/dialogue-style.entity';
 import { VisualStyle } from './entities/visual-style.entity';
 import { Ebook } from './entities/ebook.entity';
 import { EbookChapter } from './entities/ebook-chapter.entity';
+import { Project } from './entities/project.entity';
+import { ProjectTask } from './entities/project-task.entity';
 import { ModelConfigModule } from './model-config/model-config.module';
 import { EbookModule } from './ebook/ebook.module';
 import { GenerationModule } from './generation/generation.module';
 import { DialogueStyleModule } from './dialogue-style/dialogue-style.module';
 import { VisualStyleModule } from './visual-style/visual-style.module';
+import { ProjectModule } from './project/project.module';
+import { ProjectTaskModule } from './project-task/project-task.module';
 
 @Module({
   imports: [
@@ -34,6 +38,8 @@ import { VisualStyleModule } from './visual-style/visual-style.module';
         VisualStyle,
         Ebook,
         EbookChapter,
+        Project,
+        ProjectTask,
       ],
       synchronize: process.env.NODE_ENV !== 'production',
       logging: process.env.NODE_ENV === 'development',
@@ -43,6 +49,8 @@ import { VisualStyleModule } from './visual-style/visual-style.module';
     DialogueStyleModule,
     VisualStyleModule,
     EbookModule,
+    ProjectModule,
+    ProjectTaskModule,
   ],
   controllers: [AppController],
   providers: [AppService],

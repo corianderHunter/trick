@@ -1,10 +1,18 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GenerationTask, TaskStatus } from '../entities/generation-task.entity';
 import { ModelConfigService } from '../model-config/model-config.service';
-import { DialogueStyleService } from '../dialogue-style/dialogue-style.service';
-import { VisualStyleService } from '../visual-style/visual-style.service';
+import { AiClientFactory } from '../ai/ai-client.factory';
+import { buildPrompt } from '../ai/ai-director-prompt-generator';
+import type {
+  DialogueQuantifyValue,
+  VisualQuantifyValue,
+} from '../ai/ai-director-prompt-generator';
 import { CreateGenerationDto } from './dto/create-generation.dto';
 
 @Injectable()
@@ -13,30 +21,76 @@ export class GenerationService {
     @InjectRepository(GenerationTask)
     private readonly generationTaskRepository: Repository<GenerationTask>,
     private readonly modelConfigService: ModelConfigService,
-    private readonly dialogueStyleService: DialogueStyleService,
-    private readonly visualStyleService: VisualStyleService,
+    private readonly aiClientFactory: AiClientFactory,
   ) {}
 
   async create(dto: CreateGenerationDto): Promise<GenerationTask> {
-    const [modelConfig, dialogueStyle, visualStyle] = await Promise.all([
-      this.modelConfigService.findOne(dto.modelId),
-      this.dialogueStyleService.findOne(dto.dialogueStyleId),
-      this.visualStyleService.findOne(dto.visualStyleId),
-    ]);
-
+    const modelConfig = await this.modelConfigService.findOne(dto.modelId);
     if (!modelConfig) throw new BadRequestException('所选模型不存在');
-    if (!dialogueStyle) throw new BadRequestException('所选台词风格不存在');
-    if (!visualStyle) throw new BadRequestException('所选画面风格不存在');
 
     const task = this.generationTaskRepository.create({
       content: dto.content,
-      dialogueStyleId: dto.dialogueStyleId,
-      visualStyleId: dto.visualStyleId,
+      dialogueStyleId: null,
+      visualStyleId: null,
+      dialogueQuantify: dto.dialogueQuantify as Record<string, unknown>,
+      visualQuantify: dto.visualQuantify as Record<string, unknown>,
       modelConfigId: dto.modelId,
       status: TaskStatus.PENDING,
+      result: null,
+      errorMessage: null,
     });
 
-    return this.generationTaskRepository.save(task);
+    const saved = await this.generationTaskRepository.save(task);
+
+    this.processTask(saved.id).catch(() => {});
+
+    return saved;
+  }
+
+  private async processTask(taskId: string): Promise<void> {
+    await this.generationTaskRepository.update(taskId, {
+      status: TaskStatus.PROCESSING,
+    });
+
+    const task = await this.generationTaskRepository.findOne({
+      where: { id: taskId },
+      relations: ['modelConfig'],
+    });
+    if (!task || !task.dialogueQuantify || !task.visualQuantify) {
+      await this.generationTaskRepository.update(taskId, {
+        status: TaskStatus.FAILED,
+        errorMessage: '任务数据不完整',
+      });
+      return;
+    }
+
+    try {
+      const prompt = buildPrompt(
+        task.content,
+        task.dialogueQuantify as unknown as DialogueQuantifyValue,
+        task.visualQuantify as unknown as VisualQuantifyValue,
+      );
+
+      const client = this.aiClientFactory.create({
+        apiUrl: task.modelConfig.apiUrl,
+        apiKey: task.modelConfig.apiKey,
+        provider: task.modelConfig.provider,
+      });
+
+      const result = await client.generate(prompt);
+
+      await this.generationTaskRepository.update(taskId, {
+        status: TaskStatus.COMPLETED,
+        result,
+        errorMessage: null,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await this.generationTaskRepository.update(taskId, {
+        status: TaskStatus.FAILED,
+        errorMessage: message,
+      });
+    }
   }
 
   async findAll(): Promise<GenerationTask[]> {
@@ -51,5 +105,12 @@ export class GenerationService {
       where: { id },
       relations: ['modelConfig'],
     });
+  }
+
+  async remove(id: string): Promise<void> {
+    const result = await this.generationTaskRepository.delete(id);
+    if (result.affected === 0) {
+      throw new NotFoundException('生成记录不存在');
+    }
   }
 }

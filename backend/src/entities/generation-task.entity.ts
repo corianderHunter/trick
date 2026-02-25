@@ -23,11 +23,17 @@ export class GenerationTask {
   @Column({ type: 'text' })
   content: string;
 
-  @Column({ name: 'dialogue_style_id' })
-  dialogueStyleId: string;
+  @Column({ name: 'dialogue_style_id', type: 'uuid', nullable: true })
+  dialogueStyleId: string | null;
 
-  @Column({ name: 'visual_style_id' })
-  visualStyleId: string;
+  @Column({ name: 'visual_style_id', type: 'uuid', nullable: true })
+  visualStyleId: string | null;
+
+  @Column({ name: 'dialogue_quantify', type: 'jsonb', nullable: true })
+  dialogueQuantify: Record<string, unknown> | null;
+
+  @Column({ name: 'visual_quantify', type: 'jsonb', nullable: true })
+  visualQuantify: Record<string, unknown> | null;
 
   @Column({ name: 'model_config_id' })
   modelConfigId: string;
@@ -44,6 +50,12 @@ export class GenerationTask {
     default: TaskStatus.PENDING,
   })
   status: TaskStatus;
+
+  @Column({ type: 'text', nullable: true })
+  result: string | null;
+
+  @Column({ name: 'error_message', type: 'text', nullable: true })
+  errorMessage: string | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

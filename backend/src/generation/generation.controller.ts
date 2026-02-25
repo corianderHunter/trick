@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { GenerationService } from './generation.service';
 import { CreateGenerationDto } from './dto/create-generation.dto';
@@ -30,5 +30,14 @@ export class GenerationController {
   @ApiResponse({ status: 404, description: '任务不存在' })
   async findOne(@Param('id') id: string) {
     return this.generationService.findOne(id);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: '删除生成记录' })
+  @ApiParam({ name: 'id', description: '任务 ID（UUID）' })
+  @ApiResponse({ status: 200, description: '删除成功' })
+  @ApiResponse({ status: 404, description: '任务不存在' })
+  async remove(@Param('id') id: string) {
+    await this.generationService.remove(id);
   }
 }
