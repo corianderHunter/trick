@@ -151,20 +151,26 @@ function mapSceneType(arr: string[]): string {
 
 /**
  * =======================
- * Prompt Builder
+ * Prompt Builders
  * =======================
+ * 剧本创作：仅包装台词风格控制。
+ * 影视创作：仅包装画面风格控制。
  */
 
-export function buildPrompt(
-  novelText: string,
+/**
+ * 剧本创作用 prompt：只包含台词风格控制。
+ * @param content 正文/小说原文
+ * @param dialogue 台词量化指标
+ */
+export function buildPromptForScript(
+  content: string,
   dialogue: DialogueQuantifyValue,
-  visual: VisualQuantifyValue,
 ): string {
   return `
 你是一名专业电影编剧。
 
 任务：
-将以下小说原文改编为标准电影剧本格式。
+将以下内容整理或改编为电影剧本格式，重点打磨台词与对白。
 
 【台词风格控制】
 ${mapRhetoricalDensity(dialogue.rhetoricalDensity)}
@@ -173,6 +179,33 @@ ${mapTension(dialogue.dramaticTension)}
 ${mapRhythm(dialogue.rhythmStructure)}
 ${mapRegister(dialogue.registerLevel)}
 ${mapNarrativeExplicit(dialogue.narrativeExplicitness)}
+
+输出要求：
+1. 使用标准电影剧本格式（场景头、动作描述、台词分行）
+2. 台词独立成行，符合上述风格控制
+3. 风格优先级高于润色
+
+正文：
+"""
+${content}
+"""
+`;
+}
+
+/**
+ * 影视创作用 prompt：只包含画面/画风风格控制。
+ * @param content 剧本或原文
+ * @param visual 画面量化指标
+ */
+export function buildPromptForVideo(
+  content: string,
+  visual: VisualQuantifyValue,
+): string {
+  return `
+你是一名专业影视分镜/视觉设计助手。
+
+任务：
+根据以下剧本或文本，生成或优化画面描述与分镜指示，突出视觉风格。
 
 【画面风格控制】
 ${mapSaturation(visual.colorSaturation)}
@@ -183,14 +216,13 @@ ${mapDepth(visual.depthOfField)}
 ${mapSceneType(visual.sceneType)}
 
 输出要求：
-1. 使用标准电影剧本格式（INT/EXT + 时间）
-2. 画面描述独立成段
-3. 台词独立成行
-4. 风格优先级高于润色
+1. 画面描述与分镜指示符合上述风格控制
+2. 保持与原文/剧本情节一致
+3. 风格优先级高于润色
 
-小说原文：
+内容：
 """
-${novelText}
+${content}
 """
 `;
 }

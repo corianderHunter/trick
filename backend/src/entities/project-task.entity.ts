@@ -49,6 +49,52 @@ export class ProjectTask {
   @Column({ name: 'script_body', type: 'text', nullable: true })
   scriptBody: string | null;
 
+  @Column({
+    name: 'script_model_id',
+    type: 'varchar',
+    length: 36,
+    nullable: true,
+  })
+  scriptModelId: string | null;
+
+  @Column({
+    name: 'script_dialogue_quantify',
+    type: 'simple-json',
+    nullable: true,
+  })
+  scriptDialogueQuantify: Record<string, unknown> | null;
+
+  /** 剧本创作模型调用状态：未调用 / 调用中 / 已完成 / 失败 */
+  @Column({
+    name: 'script_model_call_status',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+    default: 'not_called',
+  })
+  scriptModelCallStatus:
+    | 'not_called'
+    | 'calling'
+    | 'completed'
+    | 'failed'
+    | null;
+
+  /** 模型返回结果（存档） */
+  @Column({
+    name: 'script_model_result',
+    type: 'text',
+    nullable: true,
+  })
+  scriptModelResult: string | null;
+
+  /** 模型调用失败时的错误信息 */
+  @Column({
+    name: 'script_model_error',
+    type: 'text',
+    nullable: true,
+  })
+  scriptModelError: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

@@ -8,11 +8,8 @@ import { Repository } from 'typeorm';
 import { GenerationTask, TaskStatus } from '../entities/generation-task.entity';
 import { ModelConfigService } from '../model-config/model-config.service';
 import { AiClientFactory } from '../ai/ai-client.factory';
-import { buildPrompt } from '../ai/ai-director-prompt-generator';
-import type {
-  DialogueQuantifyValue,
-  VisualQuantifyValue,
-} from '../ai/ai-director-prompt-generator';
+import { buildPromptForVideo } from '../ai/ai-director-prompt-generator';
+import type { VisualQuantifyValue } from '../ai/ai-director-prompt-generator';
 import { CreateGenerationDto } from './dto/create-generation.dto';
 
 @Injectable()
@@ -65,9 +62,8 @@ export class GenerationService {
     }
 
     try {
-      const prompt = buildPrompt(
+      const prompt = buildPromptForVideo(
         task.content,
-        task.dialogueQuantify as unknown as DialogueQuantifyValue,
         task.visualQuantify as unknown as VisualQuantifyValue,
       );
 

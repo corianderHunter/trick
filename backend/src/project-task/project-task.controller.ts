@@ -26,6 +26,19 @@ export class ProjectTaskController {
     return this.projectTaskService.findAllByProjectId(projectId);
   }
 
+  @Get(':taskId/script-call-status')
+  @ApiOperation({ summary: '仅获取剧本创作模型调用状态（轮询用）' })
+  @ApiParam({ name: 'projectId', description: '项目 ID' })
+  @ApiParam({ name: 'taskId', description: '任务 ID' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  @ApiResponse({ status: 404, description: '项目或任务不存在' })
+  async getScriptCallStatus(
+    @Param('projectId') projectId: string,
+    @Param('taskId') taskId: string,
+  ) {
+    return this.projectTaskService.getScriptCallStatus(projectId, taskId);
+  }
+
   @Get(':taskId')
   @ApiOperation({ summary: '获取单个任务' })
   @ApiParam({ name: 'projectId', description: '项目 ID' })
