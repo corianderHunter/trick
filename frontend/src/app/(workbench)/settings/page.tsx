@@ -85,6 +85,12 @@ export default function SettingsPage() {
             count={visualStyles.length}
             isLoading={visualLoading}
           />
+          <SettingsCard
+            href="/settings/prompts"
+            title="Prompt 管理"
+            count={2}
+            isLoading={false}
+          />
         </div>
       </div>
     </div>

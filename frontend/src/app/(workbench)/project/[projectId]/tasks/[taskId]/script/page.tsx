@@ -13,11 +13,17 @@ import {
 } from "@/lib/ebook-api";
 import {
   fetchProjectTask,
+  fetchProjectTasks,
   fetchScriptCallStatus,
   updateProjectTask,
   type ProjectTask,
 } from "@/lib/project-task-api";
-import { plainTextToHtml } from "@/lib/html-to-text";
+import { plainTextToHtml, htmlToPlainText } from "@/lib/html-to-text";
+import {
+  parseScriptModelResult,
+  type ScriptModelUnit,
+  type ScriptModelResult,
+} from "@/lib/script-model-result";
 import { useModelConfigs } from "@/hooks/useModelConfigs";
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import {
@@ -68,6 +74,8 @@ export default function TaskScriptPage() {
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
   const [leftEditorHtml, setLeftEditorHtml] = useState<string>("");
   const [rightEditorHtml, setRightEditorHtml] = useState<string>("");
+  /** 当 AI 返回 units 结构时，按分镜展示；每项 content 为编辑器 HTML */
+  const [rightUnits, setRightUnits] = useState<ScriptModelUnit[] | null>(null);
   const [dialogueQuantify, setDialogueQuantify] =
     useState<DialogueQuantifyValue>(defaultDialogueQuantifyValue);
   const [saving, setSaving] = useState(false);
@@ -161,10 +169,23 @@ export default function TaskScriptPage() {
     }
     const result = task.scriptModelResult ?? null;
     if (result != null && result !== "") {
-      setRightEditorHtml(plainTextToHtml(result));
+      const parsed = parseScriptModelResult(result);
+      if (parsed && parsed.units.length > 0) {
+        setRightUnits(
+          parsed.units.map((u) => ({
+            ...u,
+            content: u.content ? plainTextToHtml(u.content) : "<p></p>",
+          }))
+        );
+        setRightEditorHtml("");
+      } else {
+        setRightUnits(null);
+        setRightEditorHtml(plainTextToHtml(result));
+      }
       lastFilledResultRef.current = result;
       setRightEditorKey((k) => k + 1);
     } else {
+      setRightUnits(null);
       setRightEditorHtml("");
       lastFilledResultRef.current = null;
     }
@@ -176,7 +197,19 @@ export default function TaskScriptPage() {
     if (result == null || result === "") return;
     if (lastFilledResultRef.current === result) return;
     lastFilledResultRef.current = result;
-    setRightEditorHtml(plainTextToHtml(result));
+    const parsed = parseScriptModelResult(result);
+    if (parsed && parsed.units.length > 0) {
+      setRightUnits(
+        parsed.units.map((u) => ({
+          ...u,
+          content: u.content ? plainTextToHtml(u.content) : "<p></p>",
+        }))
+      );
+      setRightEditorHtml("");
+    } else {
+      setRightUnits(null);
+      setRightEditorHtml(plainTextToHtml(result));
+    }
     setRightEditorKey((k) => k + 1);
   }, [task?.scriptModelResult]);
 
@@ -185,6 +218,14 @@ export default function TaskScriptPage() {
     () => fetchProject(projectId)
   );
   const ebookId = project?.ebookId ?? null;
+
+  const { data: projectTasks = [] } = useSWR<ProjectTask[]>(
+    projectId ? `/api/projects/${projectId}/tasks` : null,
+    () => fetchProjectTasks(projectId)
+  );
+  const hasScriptCallInProgress = projectTasks.some(
+    (t) => t.scriptModelCallStatus === "calling"
+  );
 
   const { data: chapters = [] } = useSWR<EbookChapter[]>(
     ebookId ? `/api/ebooks/${ebookId}/chapters` : null,
@@ -224,6 +265,22 @@ export default function TaskScriptPage() {
     }
   };
 
+  const getScriptModelResultPayload = (): string | null => {
+    if (rightUnits && rightUnits.length > 0) {
+      const payload: ScriptModelResult = {
+        title: "",
+        total_duration: rightUnits.reduce((s, u) => s + (u.duration || 0), 0),
+        units: rightUnits.map((u) => ({
+          ...u,
+          content: u.content ? htmlToPlainText(u.content) : "",
+        })),
+      };
+      return JSON.stringify(payload);
+    }
+    if (rightEditorHtml.trim()) return htmlToPlainText(rightEditorHtml);
+    return null;
+  };
+
   const handleSave = async () => {
     if (!projectId || !taskId) return;
     setSaveError(null);
@@ -231,13 +288,16 @@ export default function TaskScriptPage() {
     setSaving(true);
     try {
       const scriptStatus = "in_progress";
-      const updated = await updateProjectTask(projectId, taskId, {
+      const scriptModelResult = getScriptModelResultPayload();
+      const payload: Parameters<typeof updateProjectTask>[2] = {
         scriptStatus,
         scriptBody: leftEditorHtml,
         scriptModelId: selectedModelId.trim() || null,
         scriptDialogueQuantify: dialogueQuantify,
         triggerScriptModel: false,
-      });
+      };
+      if (scriptModelResult != null) payload.scriptModelResult = scriptModelResult;
+      const updated = await updateProjectTask(projectId, taskId, payload);
       await mutateTask(updated, false);
       await globalMutate(`/api/projects/${projectId}/tasks`);
     } catch (e) {
@@ -357,10 +417,15 @@ export default function TaskScriptPage() {
             {saveError && (
               <span className="text-sm text-red-600 dark:text-red-400">{saveError}</span>
             )}
+            {hasScriptCallInProgress && !saving && (
+              <span className="text-sm text-amber-600 dark:text-amber-400">
+                当前项目有模型调用进行中，请等待完成后再试
+              </span>
+            )}
             <button
               type="button"
               onClick={handleTriggerModel}
-              disabled={saving}
+              disabled={saving || hasScriptCallInProgress}
               className={`${BUTTON_BASE} bg-emerald-600 text-white transition-colors hover:bg-emerald-700 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-700`}
             >
               {saving && saveAction === "model" ? "调用中…" : "模型调用"}
@@ -459,7 +524,7 @@ export default function TaskScriptPage() {
           </div>
         </main>
 
-        {/* 右栏 480px：模型结果填充到富文本编辑器 */}
+        {/* 右栏 480px：模型结果；units 时按分镜平铺多个编辑器，否则单编辑器 */}
         <aside className="flex w-[480px] shrink-0 flex-col overflow-hidden border-l border-stone-200 bg-white dark:border-stone-700 dark:bg-stone-800/80">
           <div className="shrink-0 border-b border-stone-100 px-3 py-2 dark:border-stone-700">
             <span className="text-xs font-medium text-stone-500 dark:text-stone-400">
@@ -467,13 +532,40 @@ export default function TaskScriptPage() {
             </span>
           </div>
           <div className="min-h-0 flex-1 overflow-auto p-2">
-            <RichTextEditor
-              key={rightEditorKey}
-              content={rightEditorHtml}
-              placeholder="保存后将自动调用模型，结果会填充到此…"
-              onChange={(html) => setRightEditorHtml(html)}
-              className="min-h-90 h-full"
-            />
+            {rightUnits && rightUnits.length > 0 ? (
+              <div className="flex flex-col gap-4">
+                {rightUnits.map((unit, index) => (
+                  <div
+                    key={`${rightEditorKey}-unit-${unit.unit_index}-${index}`}
+                    className="rounded-xl border border-stone-200 bg-white shadow-sm dark:border-stone-700 dark:bg-stone-800/80"
+                  >
+                    <RichTextEditor
+                      content={unit.content}
+                      placeholder="该分镜正文…"
+                      rightLabel={`${unit.start_time} – ${unit.end_time}`}
+                      onChange={(html) =>
+                        setRightUnits((prev) =>
+                          prev
+                            ? prev.map((u, i) =>
+                                i === index ? { ...u, content: html } : u
+                              )
+                            : null
+                        )
+                      }
+                      className="min-h-[120px]"
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <RichTextEditor
+                key={rightEditorKey}
+                content={rightEditorHtml}
+                placeholder="保存后将自动调用模型，结果会填充到此…"
+                onChange={(html) => setRightEditorHtml(html)}
+                className="min-h-90 h-full"
+              />
+            )}
           </div>
         </aside>
       </div>

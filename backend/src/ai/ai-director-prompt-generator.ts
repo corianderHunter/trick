@@ -151,39 +151,97 @@ function mapSceneType(arr: string[]): string {
 
 /**
  * =======================
- * Prompt Builders
+ * Style Blocks（拼接在存储的 prompt 之后）
  * =======================
- * 剧本创作：仅包装台词风格控制。
- * 影视创作：仅包装画面风格控制。
  */
 
-/**
- * 剧本创作用 prompt：只包含台词风格控制。
- * @param content 正文/小说原文
- * @param dialogue 台词量化指标
- */
-export function buildPromptForScript(
-  content: string,
+/** 剧本 prompt 中【台词风格控制】段落 */
+export function buildDialogueStyleBlock(
   dialogue: DialogueQuantifyValue,
 ): string {
-  return `
-你是一名专业电影编剧。
+  return [
+    mapRhetoricalDensity(dialogue.rhetoricalDensity),
+    mapEmotional(dialogue.emotionalExplicitness),
+    mapTension(dialogue.dramaticTension),
+    mapRhythm(dialogue.rhythmStructure),
+    mapRegister(dialogue.registerLevel),
+    mapNarrativeExplicit(dialogue.narrativeExplicitness),
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** 画面 prompt 中【画面风格控制】段落 */
+export function buildVisualStyleBlock(visual: VisualQuantifyValue): string {
+  return [
+    mapSaturation(visual.colorSaturation),
+    mapComposition(visual.compositionSymmetry),
+    mapCamera(visual.cameraMovement),
+    mapLight(visual.lightShadowIntensity),
+    mapDepth(visual.depthOfField),
+    mapSceneType(visual.sceneType),
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** 剧本 prompt 默认前缀（仅说明与要求，风格与正文由调用方拼接） */
+export const DEFAULT_SCRIPT_PROMPT_PREFIX = `你是一名专业电影编剧。
 
 任务：
 将以下内容整理或改编为电影剧本格式，重点打磨台词与对白。
 
-【台词风格控制】
-${mapRhetoricalDensity(dialogue.rhetoricalDensity)}
-${mapEmotional(dialogue.emotionalExplicitness)}
-${mapTension(dialogue.dramaticTension)}
-${mapRhythm(dialogue.rhythmStructure)}
-${mapRegister(dialogue.registerLevel)}
-${mapNarrativeExplicit(dialogue.narrativeExplicitness)}
-
 输出要求：
 1. 使用标准电影剧本格式（场景头、动作描述、台词分行）
 2. 台词独立成行，符合上述风格控制
-3. 风格优先级高于润色
+3. 风格优先级高于润色`;
+
+/** 画面 prompt 默认前缀 */
+export const DEFAULT_VISUAL_PROMPT_PREFIX = `你是一名专业影视分镜/视觉设计助手。
+
+任务：
+根据以下剧本或文本，生成或优化画面描述与分镜指示，突出视觉风格。
+
+输出要求：
+1. 画面描述与分镜指示符合上述风格控制
+2. 保持与原文/剧本情节一致
+3. 风格优先级高于润色`;
+
+/** 富文本 HTML 转纯文本，用于将存储的 prompt 转为可拼接的字符串 */
+function htmlToPlainText(html: string): string {
+  if (!html?.trim()) return '';
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/**
+ * =======================
+ * Prompt Builders
+ * =======================
+ * 存储的 template 为一段前缀（可为富文本 HTML），后端自动拼接【风格控制】与正文。
+ */
+
+/**
+ * 剧本创作用 prompt。template 为可选自定义前缀（支持 HTML，会转为纯文本），其后自动拼接台词风格与正文。
+ */
+export function buildPromptForScript(
+  content: string,
+  dialogue: DialogueQuantifyValue,
+  template?: string,
+): string {
+  const prefix =
+    htmlToPlainText((template && template.trim()) || '') ||
+    DEFAULT_SCRIPT_PROMPT_PREFIX;
+  const styleBlock = buildDialogueStyleBlock(dialogue);
+  return `${prefix}
+
+【台词风格控制】
+${styleBlock}
 
 正文：
 """
@@ -193,32 +251,21 @@ ${content}
 }
 
 /**
- * 影视创作用 prompt：只包含画面/画风风格控制。
- * @param content 剧本或原文
- * @param visual 画面量化指标
+ * 影视创作用 prompt。template 为可选自定义前缀（支持 HTML），其后自动拼接画面风格与正文。
  */
 export function buildPromptForVideo(
   content: string,
   visual: VisualQuantifyValue,
+  template?: string,
 ): string {
-  return `
-你是一名专业影视分镜/视觉设计助手。
-
-任务：
-根据以下剧本或文本，生成或优化画面描述与分镜指示，突出视觉风格。
+  const prefix =
+    htmlToPlainText((template && template.trim()) || '') ||
+    DEFAULT_VISUAL_PROMPT_PREFIX;
+  const styleBlock = buildVisualStyleBlock(visual);
+  return `${prefix}
 
 【画面风格控制】
-${mapSaturation(visual.colorSaturation)}
-${mapComposition(visual.compositionSymmetry)}
-${mapCamera(visual.cameraMovement)}
-${mapLight(visual.lightShadowIntensity)}
-${mapDepth(visual.depthOfField)}
-${mapSceneType(visual.sceneType)}
-
-输出要求：
-1. 画面描述与分镜指示符合上述风格控制
-2. 保持与原文/剧本情节一致
-3. 风格优先级高于润色
+${styleBlock}
 
 内容：
 """

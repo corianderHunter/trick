@@ -95,6 +95,14 @@ export class ProjectTask {
   })
   scriptModelError: string | null;
 
+  /** 剧本模型调用开始时间（用于超时/卡住恢复） */
+  @Column({
+    name: 'script_model_call_started_at',
+    type: 'timestamp',
+    nullable: true,
+  })
+  scriptModelCallStartedAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

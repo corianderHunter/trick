@@ -12,7 +12,12 @@ import { Ebook } from './entities/ebook.entity';
 import { EbookChapter } from './entities/ebook-chapter.entity';
 import { Project } from './entities/project.entity';
 import { ProjectTask } from './entities/project-task.entity';
+import { Prompt } from './entities/prompt.entity';
+import { Material } from './entities/material.entity';
+import { MaterialImage } from './entities/material-image.entity';
 import { ModelConfigModule } from './model-config/model-config.module';
+import { PromptModule } from './prompt/prompt.module';
+import { MaterialModule } from './material/material.module';
 import { EbookModule } from './ebook/ebook.module';
 import { GenerationModule } from './generation/generation.module';
 import { DialogueStyleModule } from './dialogue-style/dialogue-style.module';
@@ -40,11 +45,16 @@ import { ProjectTaskModule } from './project-task/project-task.module';
         EbookChapter,
         Project,
         ProjectTask,
+        Prompt,
+        Material,
+        MaterialImage,
       ],
       synchronize: process.env.NODE_ENV !== 'production',
       logging: process.env.NODE_ENV === 'development',
     }),
     ModelConfigModule,
+    PromptModule,
+    MaterialModule,
     GenerationModule,
     DialogueStyleModule,
     VisualStyleModule,

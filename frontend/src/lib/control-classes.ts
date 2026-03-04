@@ -17,3 +17,6 @@ export const BUTTON_BASE = `${CONTROL_ROUNDED} ${CONTROL_PADDING} ${CONTROL_TEXT
 
 /** 下拉触发器与按钮同高：与 BUTTON_BASE 一致 */
 export const SELECT_TRIGGER_BASE = `${CONTROL_ROUNDED} ${CONTROL_PADDING} ${CONTROL_TEXT}`
+
+/** 输入框基础样式（与按钮等高：py-2.5），用于 input/textarea */
+export const INPUT_BASE = `w-full ${CONTROL_ROUNDED} border border-stone-200 bg-white ${CONTROL_PADDING} text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-stone-600 dark:bg-stone-800 dark:text-stone-100 dark:placeholder:text-stone-500`

@@ -57,4 +57,11 @@ export class CreateProjectTaskDto {
   @IsOptional()
   @IsBoolean()
   triggerScriptModel?: boolean;
+
+  @ApiPropertyOptional({
+    description: '剧本模型返回结果（可为 JSON 或纯文本），保存时回写可编辑内容',
+  })
+  @IsOptional()
+  @IsString()
+  scriptModelResult?: string | null;
 }

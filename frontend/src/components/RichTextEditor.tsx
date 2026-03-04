@@ -33,12 +33,15 @@ const RichTextEditor = ({
   onChange,
   onBlur,
   className = "",
+  rightLabel,
 }: {
   content?: string;
   placeholder?: string;
   onChange?: (html: string) => void;
   onBlur?: () => void;
   className?: string;
+  /** 显示在编辑器内部顶部、字数左侧（如时间段 "00:00 – 00:15"） */
+  rightLabel?: string;
 }) => {
   const editor = useEditor({
     extensions: [
@@ -133,9 +136,12 @@ const RichTextEditor = ({
             <OrderedListIcon />
           </ToolbarButton>
         </div>
-        <span className="shrink-0 text-xs text-stone-500 dark:text-stone-400" title="字数">
-          {charCount} 字
-        </span>
+        <div className="flex shrink-0 items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
+          {rightLabel != null && rightLabel !== "" && (
+            <span title="时间段">{rightLabel}</span>
+          )}
+          <span title="字数">{charCount} 字</span>
+        </div>
       </div>
       <div className="min-h-0 flex-1 overflow-auto">
         <EditorContent editor={editor} />

@@ -33,6 +33,9 @@ test
 # production
 /build
 
+# backend uploads (e.g. material images)
+uploads/
+
 # misc
 .DS_Store
 *.pem

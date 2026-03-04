@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GenerationTask, TaskStatus } from '../entities/generation-task.entity';
 import { ModelConfigService } from '../model-config/model-config.service';
+import { PromptService } from '../prompt/prompt.service';
 import { AiClientFactory } from '../ai/ai-client.factory';
 import { buildPromptForVideo } from '../ai/ai-director-prompt-generator';
 import type { VisualQuantifyValue } from '../ai/ai-director-prompt-generator';
@@ -18,6 +19,7 @@ export class GenerationService {
     @InjectRepository(GenerationTask)
     private readonly generationTaskRepository: Repository<GenerationTask>,
     private readonly modelConfigService: ModelConfigService,
+    private readonly promptService: PromptService,
     private readonly aiClientFactory: AiClientFactory,
   ) {}
 
@@ -62,9 +64,12 @@ export class GenerationService {
     }
 
     try {
+      const visualTemplate =
+        await this.promptService.getTemplateContent('visual');
       const prompt = buildPromptForVideo(
         task.content,
         task.visualQuantify as unknown as VisualQuantifyValue,
+        visualTemplate,
       );
 
       const client = this.aiClientFactory.create({

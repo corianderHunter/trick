@@ -1,0 +1,46 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Backend: Attach",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "restart": true,
+      "cwd": "${workspaceFolder}/backend",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/backend/dist/**/*.js"],
+      "resolveSourceMapLocations": ["${workspaceFolder}/backend/**"]
+    },
+    {
+      "name": "Backend: Launch (build + run)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/dist/main.js",
+      "cwd": "${workspaceFolder}/backend",
+      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v24.13.0/bin/node",
+      "runtimeArgs": ["--inspect"],
+      "console": "internalConsole",
+      "preLaunchTask": "Backend: build",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/backend/dist/**/*.js"],
+      "resolveSourceMapLocations": ["${workspaceFolder}/backend/**"]
+    },
+    {
+      "name": "Backend: Launch (已构建时用)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/dist/main.js",
+      "cwd": "${workspaceFolder}/backend",
+      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v24.13.0/bin/node",
+      "runtimeArgs": ["--inspect"],
+      "console": "internalConsole",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/backend/dist/**/*.js"],
+      "resolveSourceMapLocations": ["${workspaceFolder}/backend/**"]
+    }
+  ]
+}

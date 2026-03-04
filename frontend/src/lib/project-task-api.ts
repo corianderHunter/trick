@@ -42,6 +42,8 @@ export type CreateProjectTaskPayload = {
   scriptBody?: string | null
   scriptModelId?: string | null
   scriptDialogueQuantify?: ScriptDialogueQuantify | null
+  /** 剧本模型返回结果（JSON 或纯文本），保存时回写可编辑内容 */
+  scriptModelResult?: string | null
 }
 
 export type UpdateProjectTaskPayload = Partial<CreateProjectTaskPayload> & {
