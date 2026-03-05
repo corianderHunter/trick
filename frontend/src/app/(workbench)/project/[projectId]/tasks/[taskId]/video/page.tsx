@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
+import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import { fetchProjectTask, updateProjectTask, type ProjectTask } from "@/lib/project-task-api";
 import { plainTextToHtml } from "@/lib/html-to-text";
 import {
@@ -11,14 +12,20 @@ import {
   type ScriptModelUnit,
 } from "@/lib/script-model-result";
 import {
+  fetchMaterials,
+  fetchMaterial,
+  materialThumbnailUrl,
+  type MaterialListItem,
+} from "@/lib/material-api";
+import {
   VisualQuantify,
   defaultVisualQuantifyValue,
   type VisualQuantifyValue,
 } from "@/components/VisualQuantify";
 import RichTextEditor from "@/components/RichTextEditor";
 import { ViewportTip } from "@/components/ViewportTip";
-import { InformationCircleIcon } from "@heroicons/react/24/outline";
-import { BUTTON_BASE } from "@/lib/control-classes";
+import { InformationCircleIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { BUTTON_BASE, INPUT_BASE } from "@/lib/control-classes";
 
 const TASK_KEY = (projectId: string, taskId: string) =>
   `/api/projects/${projectId}/tasks/${taskId}`;
@@ -26,6 +33,97 @@ const TASK_KEY = (projectId: string, taskId: string) =>
 /** 画面量化说明（与 VisualQuantify 维度一致） */
 const VISUAL_QUANTIFY_INFO =
   "色彩饱和度、构图对称性、镜头运动、光影强度、景深感、场景类型等维度调节画面风格。";
+
+/** 任务中已选物料（可编辑标题与每张图片描述） */
+export type TaskMaterialItem = {
+  materialId: string;
+  title: string;
+  images: { url: string; displayUrl: string; description: string }[];
+};
+
+/** 添加物料弹框：展示物料列表，支持多选 */
+function MaterialSelectModal({
+  open,
+  onClose,
+  selectedIds,
+  onToggle,
+  onConfirm,
+}: {
+  open: boolean;
+  onClose: () => void;
+  selectedIds: Set<string>;
+  onToggle: (id: string) => void;
+  onConfirm: () => void;
+}) {
+  const { data: list = [], isLoading } = useSWR<MaterialListItem[]>(
+    open ? "/api/materials" : null,
+    fetchMaterials
+  );
+
+  return (
+    <Dialog open={open} onClose={onClose} className="relative z-50">
+      <div className="fixed inset-0 bg-stone-900/30" aria-hidden="true" />
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <DialogPanel className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-xl bg-white shadow-lg dark:bg-stone-800">
+          <DialogTitle className="shrink-0 border-b border-stone-200 px-4 py-3 text-lg font-semibold text-stone-900 dark:border-stone-700 dark:text-stone-100">
+            选择物料
+          </DialogTitle>
+          <div className="min-h-0 flex-1 overflow-auto p-4">
+            {isLoading ? (
+              <p className="text-sm text-stone-500 dark:text-stone-400">加载中…</p>
+            ) : list.length === 0 ? (
+              <p className="text-sm text-stone-500 dark:text-stone-400">暂无物料，请先在物料库添加</p>
+            ) : (
+              <ul className="space-y-2">
+                {list.map((item) => (
+                  <li key={item.id}>
+                    <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-stone-200 p-3 transition-colors hover:bg-stone-50 dark:border-stone-600 dark:hover:bg-stone-700/50">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(item.id)}
+                        onChange={() => onToggle(item.id)}
+                        className="h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 dark:border-stone-600"
+                      />
+                      <span className="flex-1 text-sm font-medium text-stone-900 dark:text-stone-100">
+                        {item.title || "未命名物料"}
+                      </span>
+                      {(item.thumbnails?.length ?? 0) > 0 && (
+                        <div className="flex h-8 w-8 shrink-0 overflow-hidden rounded bg-stone-200 dark:bg-stone-700">
+                          <img
+                            src={materialThumbnailUrl(item.thumbnails[0])}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      )}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="shrink-0 flex justify-end gap-2 border-t border-stone-200 px-4 py-3 dark:border-stone-700">
+            <button
+              type="button"
+              onClick={onClose}
+              className={`${BUTTON_BASE} border border-stone-200 bg-white text-stone-700 hover:bg-stone-50 dark:border-stone-600 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700`}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={selectedIds.size === 0}
+              className={`${BUTTON_BASE} bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 dark:bg-amber-600 dark:hover:bg-amber-700`}
+            >
+              确定（已选 {selectedIds.size}）
+            </button>
+          </div>
+        </DialogPanel>
+      </div>
+    </Dialog>
+  );
+}
 
 export default function TaskVideoPage() {
   const params = useParams();
@@ -47,8 +145,65 @@ export default function TaskVideoPage() {
     defaultVisualQuantifyValue
   );
 
+  /** 中栏：已选物料（可编辑标题与每图描述） */
+  const [taskMaterials, setTaskMaterials] = useState<TaskMaterialItem[]>([]);
+  const [materialModalOpen, setMaterialModalOpen] = useState(false);
+  /** 弹框内勾选的物料 id */
+  const [modalSelectedIds, setModalSelectedIds] = useState<Set<string>>(new Set());
+
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  /** 弹框确认：拉取选中物料详情并追加到中栏 */
+  const confirmMaterialSelection = useCallback(async () => {
+    if (modalSelectedIds.size === 0) {
+      setMaterialModalOpen(false);
+      return;
+    }
+    const ids = Array.from(modalSelectedIds);
+    const details = await Promise.all(ids.map((id) => fetchMaterial(id)));
+    const newItems: TaskMaterialItem[] = details.map((d) => ({
+      materialId: d.id,
+      title: d.title ?? "未命名物料",
+      images: (d.images ?? []).map((img) => ({
+        url: img.url,
+        displayUrl: materialThumbnailUrl(img.url),
+        description: img.description ?? "",
+      })),
+    }));
+    setTaskMaterials((prev) => {
+      const existingIds = new Set(prev.map((m) => m.materialId));
+      const toAdd = newItems.filter((m) => !existingIds.has(m.materialId));
+      return [...prev, ...toAdd];
+    });
+    setModalSelectedIds(new Set());
+    setMaterialModalOpen(false);
+  }, [modalSelectedIds]);
+
+  const removeTaskMaterial = useCallback((materialId: string) => {
+    setTaskMaterials((prev) => prev.filter((m) => m.materialId !== materialId));
+  }, []);
+
+  const updateTaskMaterialTitle = useCallback((materialId: string, title: string) => {
+    setTaskMaterials((prev) =>
+      prev.map((m) => (m.materialId === materialId ? { ...m, title } : m))
+    );
+  }, []);
+
+  const updateTaskMaterialImageDesc = useCallback(
+    (materialId: string, imageIndex: number, description: string) => {
+      setTaskMaterials((prev) =>
+        prev.map((m) => {
+          if (m.materialId !== materialId) return m;
+          const nextImages = [...m.images];
+          if (imageIndex >= 0 && imageIndex < nextImages.length)
+            nextImages[imageIndex] = { ...nextImages[imageIndex], description };
+          return { ...m, images: nextImages };
+        })
+      );
+    },
+    []
+  );
 
   useEffect(() => {
     if (!task?.id) return;
@@ -169,9 +324,9 @@ export default function TaskVideoPage() {
           </div>
         </aside>
 
-        {/* 中栏：画面量化（与随想页一致） */}
+        {/* 中栏：画面量化 + 添加物料（下） + 已选物料，宽度 80% 居中、扁平 */}
         <main className="min-w-0 flex-1 overflow-auto bg-stone-50/50 dark:bg-stone-900/30">
-          <div className="flex h-full flex-col p-6">
+          <div className="flex h-full flex-col gap-4 p-6">
             <div className="shrink-0">
               <div className="inline-flex items-center gap-1.5">
                 <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
@@ -188,15 +343,122 @@ export default function TaskVideoPage() {
                   />
                 </ViewportTip>
               </div>
+              <div className="mt-2 border border-stone-200 bg-white p-3 dark:border-stone-600 dark:bg-stone-800/80">
+                <VisualQuantify
+                  value={visualQuantify}
+                  onChange={setVisualQuantify}
+                />
+              </div>
             </div>
-            <div className="mt-4 min-h-0 flex-1 overflow-auto rounded-xl border border-stone-200 bg-white p-4 dark:border-stone-700 dark:bg-stone-800/80">
-              <VisualQuantify
-                value={visualQuantify}
-                onChange={setVisualQuantify}
-              />
+
+            <div className="shrink-0 rounded-lg border border-stone-200 bg-white p-4 dark:border-stone-600 dark:bg-stone-800/80">
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setMaterialModalOpen(true)}
+                  className="inline-flex w-[80%] items-center justify-center gap-1.5 rounded border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50 dark:border-stone-600 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700"
+                >
+                  <svg className="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  添加物料
+                </button>
+              </div>
+
+              {taskMaterials.length > 0 && (
+                <div className="mt-4 space-y-2 border-t border-stone-200 pt-4 dark:border-stone-600">
+                  <h2 className="text-xs font-medium text-stone-600 dark:text-stone-400">
+                    已选物料
+                  </h2>
+                  <ul className="flex flex-col gap-2">
+                    {taskMaterials.map((item) => (
+                      <li
+                        key={item.materialId}
+                        className="rounded border border-stone-200 bg-stone-50/80 p-2 dark:border-stone-600 dark:bg-stone-800/50"
+                      >
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={item.title}
+                            onChange={(e) =>
+                              updateTaskMaterialTitle(item.materialId, e.target.value)
+                            }
+                            className="min-w-0 flex-1 rounded border border-stone-200 bg-white px-2 py-1 text-xs text-stone-900 placeholder:text-stone-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-stone-600 dark:bg-stone-800 dark:text-stone-100 dark:placeholder:text-stone-500"
+                            placeholder="物料标题"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeTaskMaterial(item.materialId)}
+                            className="shrink-0 rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600 dark:hover:bg-stone-700 dark:hover:text-stone-300"
+                            aria-label="移除此物料"
+                          >
+                            <XMarkIcon className="size-4" />
+                          </button>
+                        </div>
+                        <ul className="mt-2 space-y-1.5">
+                          {item.images.map((img, idx) => (
+                            <li
+                              key={idx}
+                              className="flex items-center gap-2 border-t border-stone-100 pt-1.5 dark:border-stone-700"
+                            >
+                              <div className="h-10 w-10 shrink-0 overflow-hidden rounded bg-stone-200 dark:bg-stone-700">
+                                {img.displayUrl ? (
+                                  <img
+                                    src={img.displayUrl}
+                                    alt=""
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center text-stone-400">
+                                    <svg className="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" />
+                                    </svg>
+                                  </div>
+                                )}
+                              </div>
+                              <input
+                                type="text"
+                                value={img.description}
+                                onChange={(e) =>
+                                  updateTaskMaterialImageDesc(
+                                    item.materialId,
+                                    idx,
+                                    e.target.value
+                                  )
+                                }
+                                className="min-w-0 flex-1 rounded border border-stone-200 bg-white px-2 py-1 text-xs text-stone-900 placeholder:text-stone-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-stone-600 dark:bg-stone-800 dark:text-stone-100 dark:placeholder:text-stone-500"
+                                placeholder="图片描述"
+                              />
+                            </li>
+                          ))}
+                        </ul>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         </main>
+
+        {/* 添加物料弹框：物料列表多选 */}
+        <MaterialSelectModal
+          open={materialModalOpen}
+          onClose={() => {
+            setMaterialModalOpen(false);
+            setModalSelectedIds(new Set());
+          }}
+          selectedIds={modalSelectedIds}
+          onToggle={(id) => {
+            setModalSelectedIds((prev) => {
+              const next = new Set(prev);
+              if (next.has(id)) next.delete(id);
+              else next.add(id);
+              return next;
+            });
+          }}
+          onConfirm={confirmMaterialSelection}
+        />
 
         {/* 右栏 480px：多个视频从上到下平铺（占位） */}
         <aside className="flex w-[480px] shrink-0 flex-col overflow-hidden border-l border-stone-200 bg-white dark:border-stone-700 dark:bg-stone-800/80">
